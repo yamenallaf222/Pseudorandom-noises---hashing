@@ -11,7 +11,7 @@ public class HashVisualization : MonoBehaviour
 
     static uint RotateLeft(uint data, int steps) => (data << steps) | (data >> (32 - steps));
 
-    public struct SmallXXHash
+    public readonly struct SmallXXHash
     {
         const uint primeA = 0b10011110001101110111100110110001;
 	    const uint primeB = 0b10000101111010111100101001110111;
@@ -19,7 +19,7 @@ public class HashVisualization : MonoBehaviour
 	    const uint primeD = 0b00100111110101001110101100101111;
 	    const uint primeE = 0b00010110010101100110011110110001;
 
-        uint accumulator;
+        readonly uint accumulator;
 
         public static implicit operator  uint(SmallXXHash hash) 
         {
@@ -34,23 +34,21 @@ public class HashVisualization : MonoBehaviour
             return avalanche;
         }
 
-        public SmallXXHash Eat(int data)
+        public SmallXXHash Eat(int data) => RotateLeft(accumulator + (uint)data * primeC, 17) * primeD;
+        
+
+        public SmallXXHash Eat(byte data) =>  RotateLeft(accumulator + data * primeE, 11) * primeA;
+
+
+        public static implicit operator SmallXXHash(uint accumulator) => new SmallXXHash(accumulator);
+
+        public static SmallXXHash seed(int seed) => (uint) seed + primeE;
+
+
+
+        public SmallXXHash(uint accumulator)
         {
-            accumulator = RotateLeft(accumulator + (uint)data * primeC, 17) * primeD;
-            return this;
-        }
-
-        public SmallXXHash Eat(byte data)
-        {
-            accumulator = RotateLeft(accumulator + data * primeE, 11) * primeA;
-
-            return this;
-        }
-
-
-        public SmallXXHash(int seed)
-        {
-            accumulator = (uint) seed + primeE;
+            this.accumulator = accumulator;
         }
 
     }
@@ -69,6 +67,12 @@ public class HashVisualization : MonoBehaviour
 
     [SerializeField, Range(1, 512)]
     int resolution = 16;
+
+    [SerializeField, Range(-2f, 2f)]
+    float verticalOffset = 1f;
+
+    [SerializeField]
+    int seed;
 
 
     NativeArray<uint> hashes;
@@ -89,6 +93,8 @@ public class HashVisualization : MonoBehaviour
 
         public float invResolution;
 
+        public SmallXXHash hash;
+
         public void Execute(int i)
         {
             int v = (int) floor(invResolution * i + 0.00001f);
@@ -99,7 +105,7 @@ public class HashVisualization : MonoBehaviour
 
             v -= resolution / 2;
 
-            hashes[i] = new SmallXXHash(0).Eat(u).Eat(v);
+            hashes[i] = hash.Eat(u).Eat(v);
         }
 
     }
@@ -118,7 +124,8 @@ public class HashVisualization : MonoBehaviour
         {
             hashes = hashes,
             resolution = resolution,
-            invResolution = 1f / resolution
+            invResolution = 1f / resolution,
+            hash = SmallXXHash.seed(seed)
 
         }.ScheduleParallel(hashes.Length, resolution, default).Complete();
 
@@ -129,7 +136,7 @@ public class HashVisualization : MonoBehaviour
 
         propertyBlock.SetBuffer(hashesId, hashesBuffer);
 
-        propertyBlock.SetVector(configId, new Vector4(resolution, 1f/ resolution));
+        propertyBlock.SetVector(configId, new Vector4(resolution, 1f/ resolution, verticalOffset / resolution));
 
     }
 
@@ -156,7 +163,7 @@ public class HashVisualization : MonoBehaviour
 
 
     private void Update() {
-        
+
         Graphics.DrawMeshInstancedProcedural(instanceMesh, 0, material, new Bounds(Vector3.zero, Vector3.one), hashes.Length, propertyBlock);
     }
 }

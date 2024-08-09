@@ -19,7 +19,7 @@ void ConfigureProcedural()
 
         unity_ObjectToWorld._m03_m13_m23_m33 = float4(
             _Config.y * (u + 0.5) - 0.5,
-            _Config.z * ((1.0 / 255.0) * (_Hashes[unity_InstanceID] >> 24)) - 0.5) ,
+            _Config.z * ((1.0 / 255.0) * (_Hashes[unity_InstanceID] >> 24) - 0.5) ,
             _Config.y * (v + 0.5) - 0.5,
             1.0
         );

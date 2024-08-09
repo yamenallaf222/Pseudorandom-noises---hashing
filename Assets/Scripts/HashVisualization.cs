@@ -1,10 +1,11 @@
+using System;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
-
 using static Unity.Mathematics.math;
+
 
 public class HashVisualization : MonoBehaviour
 {
@@ -56,6 +57,8 @@ public class HashVisualization : MonoBehaviour
 
     static int
         hashesId = Shader.PropertyToID("_Hashes"),
+        normalsId = Shader.PropertyToID("_Normals"),
+        positionsId = Shader.PropertyToID("_Positions"),
         configId = Shader.PropertyToID("_Config");
 
 
@@ -65,19 +68,31 @@ public class HashVisualization : MonoBehaviour
     [SerializeField]
     Material material;
 
+    [SerializeField]
+    SpaceTRS domain = new SpaceTRS{scale = 8f};
+
+
     [SerializeField, Range(1, 512)]
     int resolution = 16;
 
-    [SerializeField, Range(-2f, 2f)]
-    float verticalOffset = 1f;
+    [SerializeField, Range(- 0.5f, 0.5f)]
+    float displacement = 0.1f;
 
     [SerializeField]
     int seed;
 
-
     NativeArray<uint> hashes;
 
+    NativeArray<float3> positions, normals;
+
+
     ComputeBuffer hashesBuffer;
+    ComputeBuffer positionsBuffer;
+    ComputeBuffer normalsBuffer;
+
+
+    Bounds bounds;
+
 
     MaterialPropertyBlock propertyBlock;
 
@@ -86,67 +101,87 @@ public class HashVisualization : MonoBehaviour
     struct HashJob : IJobFor
     {
 
+
+        [ReadOnly]
+        public NativeArray<float3> positions;
+
         [WriteOnly]
         public NativeArray<uint> hashes;
 
-        public int resolution;
 
-        public float invResolution;
 
         public SmallXXHash hash;
 
+
+        public float3x4 domainTRS;
+
         public void Execute(int i)
         {
-            int v = (int) floor(invResolution * i + 0.00001f);
 
             /* u first to not incorporate modified v in u as it will mess up the mapping as
             we re mapping from 1D indexing to 2D grid indexing based on index = (row * colCount + column) "deducing the 'row' and 'col' from 'index'" */
-            int u = i - resolution * v - resolution / 2;
 
-            v -= resolution / 2;
 
-            hashes[i] = hash.Eat(u).Eat(v);
+
+            float3 p = mul(domainTRS, float4(positions[i], 1f));
+
+            int u = (int)floor(p.x);
+
+            int v = (int)floor(p.y);
+
+            int w = (int)floor(p.z);
+
+            hashes[i] = hash.Eat(u).Eat(v).Eat(w);
         }
 
     }
 
+    
+    bool isDirty;
 
 
     private void OnEnable() {
         
+        isDirty = true;
+
         int length = resolution * resolution;
 
         hashes = new NativeArray<uint>(length, Allocator.Persistent);
 
+        positions = new NativeArray<float3>(length, Allocator.Persistent);
+
+        normals = new NativeArray<float3>(length, Allocator.Persistent);
+
         hashesBuffer = new ComputeBuffer(length, 4);
 
-        new HashJob
-        {
-            hashes = hashes,
-            resolution = resolution,
-            invResolution = 1f / resolution,
-            hash = SmallXXHash.seed(seed)
+        positionsBuffer = new ComputeBuffer(length, 3 * 4);
 
-        }.ScheduleParallel(hashes.Length, resolution, default).Complete();
-
-
-        hashesBuffer.SetData(hashes);
+        normalsBuffer = new ComputeBuffer(length, 3 * 4);
 
         propertyBlock ??= new MaterialPropertyBlock();
 
         propertyBlock.SetBuffer(hashesId, hashesBuffer);
 
-        propertyBlock.SetVector(configId, new Vector4(resolution, 1f/ resolution, verticalOffset / resolution));
+        propertyBlock.SetBuffer(positionsId, positionsBuffer);
 
-    }
+        propertyBlock.SetBuffer(normalsId, normalsBuffer);
+
+        propertyBlock.SetVector(configId, new Vector4(resolution, 1f/ resolution, displacement));
+
+        }
 
     private void OnDisable() {
         
         hashes.Dispose();
-
+        positions.Dispose();
+        normals.Dispose();
         hashesBuffer.Release();
+        positionsBuffer.Release();
+        normalsBuffer.Release();
 
         hashesBuffer = null;
+        positionsBuffer = null;
+        normalsBuffer = null;
 
     }
 
@@ -163,7 +198,35 @@ public class HashVisualization : MonoBehaviour
 
 
     private void Update() {
+        
+        if(isDirty || transform.hasChanged)
+        {
+            isDirty = false;
 
-        Graphics.DrawMeshInstancedProcedural(instanceMesh, 0, material, new Bounds(Vector3.zero, Vector3.one), hashes.Length, propertyBlock);
+            transform.hasChanged = false;
+
+            JobHandle handle = Shapes.Job.ScheduleParallel(positions, normals, resolution,transform.localToWorldMatrix, default);
+
+            new HashJob
+            {
+                positions = positions,
+                hashes = hashes,
+                hash = SmallXXHash.seed(seed),
+                domainTRS = domain.Matrix
+            }.ScheduleParallel(hashes.Length, resolution, handle).Complete();
+
+
+            hashesBuffer.SetData(hashes);
+            positionsBuffer.SetData(positions);
+            normalsBuffer.SetData(normals);
+
+
+            bounds = new Bounds(transform.position, float3(2f * cmax(abs(transform.lossyScale)) + displacement));
+
+
+        }
+
+
+        Graphics.DrawMeshInstancedProcedural(instanceMesh, 0, material, bounds, hashes.Length, propertyBlock);
     }
 }

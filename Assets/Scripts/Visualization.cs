@@ -10,7 +10,6 @@ using static Unity.Mathematics.math;
 public abstract class Visualization : MonoBehaviour
 {
 
-
     public readonly struct SmallXXHash
     {
         const uint primeA = 0b10011110001101110111100110110001;
@@ -44,7 +43,7 @@ public abstract class Visualization : MonoBehaviour
 
         public static implicit operator SmallXXHash(uint accumulator) => new SmallXXHash(accumulator);
 
-        public static SmallXXHash seed(int seed) => (uint) seed + primeE;
+        public static SmallXXHash Seed(int seed) => (uint) seed + primeE;
 
 
 
@@ -78,6 +77,26 @@ public abstract class Visualization : MonoBehaviour
         
         static uint4 RotateLeft (uint4 data, int steps) =>
             (data << steps) | (data >> 32 - steps);
+
+
+        public uint4 BytesA => (uint4)this & 255;
+        
+        public uint4 BytesB => ((uint4)this >> 8) & 255;
+
+        public uint4 BytesC => ((uint4)this >> 16) & 255;
+
+        public uint4 BytesD => (uint4)this >> 24;
+
+
+        public float4 Floats01A => (float4) BytesA * (1f / 255f);
+        
+        public float4 Floats01B => (float4)BytesB * (1f / 255f);
+
+        public float4 Floats01C => (float4)BytesC * (1f / 255f);
+
+        public float4 Floats01D => (float4)BytesD * (1f / 255f);
+
+
 
         public SmallXXHash4 Eat (int4 data) =>
             RotateLeft(accumulator + (uint4)data * primeC, 17) * primeD;
@@ -222,7 +241,6 @@ public abstract class Visualization : MonoBehaviour
 
             transform.hasChanged = false;
 
-            JobHandle handle = shapeJobs[(int)shape](positions, normals, resolution,transform.localToWorldMatrix, default);
 
             UpdateVisualization(positions, resolution,
             shapeJobs[(int)shape](positions, normals, resolution,transform.localToWorldMatrix, default));

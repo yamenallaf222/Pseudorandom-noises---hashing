@@ -5,6 +5,7 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
 using static Unity.Mathematics.math;
+using static MathExtensions;
 
 
 public class HashVisualization : Visualization
@@ -44,12 +45,6 @@ public class HashVisualization : Visualization
 
         public float3x4 domainTRS;
 
-        float4x3 TransformPositions (float3x4 trs, float4x3 p) => float4x3(
-            trs.c0.x * p.c0 + trs.c1.x * p.c1 + trs.c2.x * p.c2 + trs.c3.x,
-            trs.c0.y * p.c0 + trs.c1.y * p.c1 + trs.c2.y * p.c2 + trs.c3.y,
-            trs.c0.z * p.c0 + trs.c1.z * p.c1 + trs.c2.z * p.c2 + trs.c3.z
-        );
-
 
         public void Execute(int i)
         {
@@ -57,9 +52,7 @@ public class HashVisualization : Visualization
             /* u first to not incorporate modified v in u as it will mess up the mapping as
             we re mapping from 1D indexing to 2D grid indexing based on index = (row * colCount + column) "deducing the 'row' and 'col' from 'index'" */
 
-
-
-            float4x3 p = TransformPositions(domainTRS,transpose(positions[i]));
+            float4x3 p = domainTRS.TransformVectors(transpose(positions[i]));
 
             int4 u = (int4)floor(p.c0);
 
@@ -99,15 +92,14 @@ public class HashVisualization : Visualization
     protected override void UpdateVisualization(NativeArray<float3x4> positions, int resolution, JobHandle handle)
     {
         
-            new HashJob
-            {
-                positions = positions,
-                hashes = hashes,
-                hash = SmallXXHash.seed(seed),
-                domainTRS = domain.Matrix
-            }.ScheduleParallel(hashes.Length, resolution, handle).Complete();
+        new HashJob
+        {
+            positions = positions,
+            hashes = hashes,
+            hash = SmallXXHash.Seed(seed),
+            domainTRS = domain.Matrix
+        }.ScheduleParallel(hashes.Length, resolution, handle).Complete();
 
-
-            hashesBuffer.SetData(hashes);
+        hashesBuffer.SetData(hashes.Reinterpret<uint>( 4 * 4));
     }
 }

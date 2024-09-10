@@ -15,27 +15,132 @@ public class NoiseVisualization : Visualization
 
 
     [SerializeField]
-    SpaceTRS domain = new SpaceTRS{scale = 8f};
+    SpaceTRS domain = new SpaceTRS{scale = 2f};
 
 
     [SerializeField]
-    int seed;
+    Settings noiseSettings = Settings.Default;
+
+    [SerializeField]
+	bool tiling;
 
 
-    public enum NoiseType{Perlin, Value}
+    public enum NoiseType{Perlin, PerlinTurbulence, Value, ValueTurbulence,
+			Simplex, SimplexTurbulence, SimplexValue, SimplexValueTurbulence, VoronoiWorleyF1, VoronoiWorelyF2, VoronoiWorleyF2MinusF1,
+		VoronoiChebyshevF1, VoronoiChebyshevF2, VoronoiChebyshevF2MinusF1}
 
 
     static ScheduleDelegate[,] noiseJobs = {
+		{
+			Job<Lattice1D<LatticeNormal, Perlin>>.ScheduleParallel,
+            Job<Lattice1D<LatticeTiling, Perlin>>.ScheduleParallel,
+			Job<Lattice2D<LatticeNormal, Perlin>>.ScheduleParallel,
+            Job<Lattice2D<LatticeTiling, Perlin>>.ScheduleParallel,
+			Job<Lattice3D<LatticeNormal, Perlin>>.ScheduleParallel,
+            Job<Lattice3D<LatticeTiling, Perlin>>.ScheduleParallel
+		},
+		{
+			Job<Lattice1D<LatticeNormal, Turbulence<Perlin>>>.ScheduleParallel,
+            Job<Lattice1D<LatticeTiling, Turbulence<Perlin>>>.ScheduleParallel,
+			Job<Lattice2D<LatticeNormal, Turbulence<Perlin>>>.ScheduleParallel,
+            Job<Lattice2D<LatticeTiling, Turbulence<Perlin>>>.ScheduleParallel,
+			Job<Lattice3D<LatticeNormal, Turbulence<Perlin>>>.ScheduleParallel,
+            Job<Lattice3D<LatticeTiling, Turbulence<Perlin>>>.ScheduleParallel
+		},
+		{
+			Job<Lattice1D<LatticeNormal, Value>>.ScheduleParallel,
+            Job<Lattice1D<LatticeTiling, Value>>.ScheduleParallel,
+			Job<Lattice2D<LatticeNormal, Value>>.ScheduleParallel,
+            Job<Lattice2D<LatticeTiling, Value>>.ScheduleParallel,
+			Job<Lattice3D<LatticeNormal, Value>>.ScheduleParallel,
+            Job<Lattice3D<LatticeTiling, Value>>.ScheduleParallel
+		},
+		{
+			Job<Lattice1D<LatticeNormal, Turbulence<Value>>>.ScheduleParallel,
+            Job<Lattice1D<LatticeTiling, Turbulence<Value>>>.ScheduleParallel,
+			Job<Lattice2D<LatticeNormal, Turbulence<Value>>>.ScheduleParallel,
+            Job<Lattice2D<LatticeTiling, Turbulence<Value>>>.ScheduleParallel,
+			Job<Lattice3D<LatticeNormal, Turbulence<Value>>>.ScheduleParallel,
+            Job<Lattice3D<LatticeTiling, Turbulence<Value>>>.ScheduleParallel
+		},
+				{
+			Job<Simplex1D<Simplex>>.ScheduleParallel,
+			Job<Simplex1D<Simplex>>.ScheduleParallel,
+			Job<Simplex2D<Simplex>>.ScheduleParallel,
+			Job<Simplex2D<Simplex>>.ScheduleParallel,
+			Job<Simplex3D<Simplex>>.ScheduleParallel,
+			Job<Simplex3D<Simplex>>.ScheduleParallel
+		},
+		{
+			Job<Simplex1D<Turbulence<Simplex>>>.ScheduleParallel,
+			Job<Simplex1D<Turbulence<Simplex>>>.ScheduleParallel,
+			Job<Simplex2D<Turbulence<Simplex>>>.ScheduleParallel,
+			Job<Simplex2D<Turbulence<Simplex>>>.ScheduleParallel,
+			Job<Simplex3D<Turbulence<Simplex>>>.ScheduleParallel,
+			Job<Simplex3D<Turbulence<Simplex>>>.ScheduleParallel
+		},
+		{
+			Job<Simplex1D<Value>>.ScheduleParallel,
+			Job<Simplex1D<Value>>.ScheduleParallel,
+			Job<Simplex2D<Value>>.ScheduleParallel,
+			Job<Simplex2D<Value>>.ScheduleParallel,
+			Job<Simplex3D<Value>>.ScheduleParallel,
+			Job<Simplex3D<Value>>.ScheduleParallel
+		},
+		{
+			Job<Simplex1D<Turbulence<Value>>>.ScheduleParallel,
+			Job<Simplex1D<Turbulence<Value>>>.ScheduleParallel,
+			Job<Simplex2D<Turbulence<Value>>>.ScheduleParallel,
+			Job<Simplex2D<Turbulence<Value>>>.ScheduleParallel,
+			Job<Simplex3D<Turbulence<Value>>>.ScheduleParallel,
+			Job<Simplex3D<Turbulence<Value>>>.ScheduleParallel
+		},
         {
-            Job<Lattice1D<Perlin>>.ScheduleParallel,
-            Job<Lattice2D<Perlin>>.ScheduleParallel,
-            Job<Lattice3D<Perlin>>.ScheduleParallel
-        },
+			Job<Voronoi1D<LatticeNormal, Worley, F1>>.ScheduleParallel,
+			Job<Voronoi1D<LatticeTiling, Worley, F1>>.ScheduleParallel,
+			Job<Voronoi2D<LatticeNormal, Worley, F1>>.ScheduleParallel,
+			Job<Voronoi2D<LatticeTiling, Worley, F1>>.ScheduleParallel,
+			Job<Voronoi3D<LatticeNormal, Worley, F1>>.ScheduleParallel,
+			Job<Voronoi3D<LatticeTiling, Worley, F1>>.ScheduleParallel
+		},
         {
-            Job<Lattice1D<Value>>.ScheduleParallel,
-            Job<Lattice2D<Value>>.ScheduleParallel,
-            Job<Lattice3D<Value>>.ScheduleParallel
-        }
+			Job<Voronoi1D<LatticeNormal, Worley, F2>>.ScheduleParallel,
+			Job<Voronoi1D<LatticeTiling, Worley, F2>>.ScheduleParallel,
+			Job<Voronoi2D<LatticeNormal, Worley, F2>>.ScheduleParallel,
+			Job<Voronoi2D<LatticeTiling, Worley, F2>>.ScheduleParallel,
+			Job<Voronoi3D<LatticeNormal, Worley, F2>>.ScheduleParallel,
+			Job<Voronoi3D<LatticeTiling, Worley, F2>>.ScheduleParallel
+		},
+		{
+			Job<Voronoi1D<LatticeNormal, Worley, F2MinusF1>>.ScheduleParallel,
+			Job<Voronoi1D<LatticeTiling, Worley, F2MinusF1>>.ScheduleParallel,
+			Job<Voronoi2D<LatticeNormal, Worley, F2MinusF1>>.ScheduleParallel,
+			Job<Voronoi2D<LatticeTiling, Worley, F2MinusF1>>.ScheduleParallel,
+			Job<Voronoi3D<LatticeNormal, Worley, F2MinusF1>>.ScheduleParallel,
+			Job<Voronoi3D<LatticeTiling, Worley, F2MinusF1>>.ScheduleParallel
+		},
+		{
+			Job<Voronoi1D<LatticeNormal, Worley, F1>>.ScheduleParallel,
+			Job<Voronoi1D<LatticeTiling, Worley, F1>>.ScheduleParallel,
+			Job<Voronoi2D<LatticeNormal, Chebyshev, F1>>.ScheduleParallel,
+			Job<Voronoi2D<LatticeTiling, Chebyshev, F1>>.ScheduleParallel,
+			Job<Voronoi3D<LatticeNormal, Chebyshev, F1>>.ScheduleParallel,
+			Job<Voronoi3D<LatticeTiling, Chebyshev, F1>>.ScheduleParallel
+		},{
+			Job<Voronoi1D<LatticeNormal, Worley, F2>>.ScheduleParallel,
+			Job<Voronoi1D<LatticeTiling, Worley, F2>>.ScheduleParallel,
+			Job<Voronoi2D<LatticeNormal, Chebyshev, F2>>.ScheduleParallel,
+			Job<Voronoi2D<LatticeTiling, Chebyshev, F2>>.ScheduleParallel,
+			Job<Voronoi3D<LatticeNormal, Chebyshev, F2>>.ScheduleParallel,
+			Job<Voronoi3D<LatticeTiling, Chebyshev, F2>>.ScheduleParallel
+		},{
+			Job<Voronoi1D<LatticeNormal, Worley, F2MinusF1>>.ScheduleParallel,
+			Job<Voronoi1D<LatticeTiling, Worley, F2MinusF1>>.ScheduleParallel,
+			Job<Voronoi2D<LatticeNormal, Chebyshev, F2MinusF1>>.ScheduleParallel,
+			Job<Voronoi2D<LatticeTiling, Chebyshev, F2MinusF1>>.ScheduleParallel,
+			Job<Voronoi3D<LatticeNormal, Chebyshev, F2MinusF1>>.ScheduleParallel,
+			Job<Voronoi3D<LatticeTiling, Chebyshev, F2MinusF1>>.ScheduleParallel
+		}
 	};
 
     
@@ -78,7 +183,7 @@ public class NoiseVisualization : Visualization
     protected override void UpdateVisualization(NativeArray<float3x4> positions, int resolution, JobHandle handle)
     {
         
-        noiseJobs[(int) type, dimensions - 1](positions, noise, seed, domain, resolution, handle).Complete();
+        noiseJobs[(int) type, 2 * dimensions - (tiling ? 1 : 2)](positions, noise, noiseSettings, domain, resolution, handle).Complete();
 
         noiseBuffer.SetData(noise.Reinterpret<uint>( 4 * 4));
     }

@@ -70,6 +70,8 @@ public abstract class Visualization : MonoBehaviour
             this.accumulator = accumulator;
         }
 
+        public static SmallXXHash4 operator + (SmallXXHash4 h, int v) => h.accumulator + (uint) v;
+
         public static implicit operator SmallXXHash4 (uint4 accumulator) =>
             new SmallXXHash4(accumulator);
 
@@ -111,6 +113,18 @@ public abstract class Visualization : MonoBehaviour
             avalanche ^= avalanche >> 16;
 
             return avalanche;
+        }
+
+        public static SmallXXHash4 select (SmallXXHash4 a, SmallXXHash4 b, bool4 c) => math.select(a.accumulator, b.accumulator, c);
+
+        public uint4 GetBits(int count, int shift)
+        {
+            return ((uint4)this >> shift) & (uint)( (1 << count) - 1);
+        }
+
+        public float4 GetBitsAsFloats01(int count, int shift)
+        {
+            return (float4)GetBits(count, shift) * (1f / (( 1 << count) - 1));
         }
     }
 

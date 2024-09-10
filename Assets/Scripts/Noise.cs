@@ -1,19 +1,48 @@
+using System;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
+using UnityEngine;
 using static Unity.Mathematics.math;
 using static Visualization;
 
 public static partial class Noise {
 
+
+
+
+	[Serializable]
+	public struct Settings
+	{
+		public int seed;
+
+		[Range(1, 6)]
+		public int octaves;
+
+		[Range(2, 4)]
+		public int lacunarity;
+
+		[Min(1)]
+		public int frequency;
+		[Range(0f, 1f)]
+		public float persistence;
+
+
+		public static Settings Default => new Settings{
+			frequency = 4,
+			octaves = 1
+		};
+	}
+
+
 	public delegate JobHandle ScheduleDelegate (
 		NativeArray<float3x4> positions, NativeArray<float4> noise,
-		int seed, SpaceTRS domainTRS, int resolution, JobHandle dependency
+		Settings settings, SpaceTRS domainTRS, int resolution, JobHandle dependency
 	);
 
 	public interface INoise {
-		float4 GetNoise4 (float4x3 positions, SmallXXHash4 hash);
+		float4 GetNoise4 (float4x3 positions, SmallXXHash4 hash, int frequency);
 	}
 
 	[BurstCompile(FloatPrecision.Standard, FloatMode.Fast, CompileSynchronously = true)]
@@ -25,23 +54,36 @@ public static partial class Noise {
 		[WriteOnly]
 		public NativeArray<float4> noise;
 
-		public SmallXXHash4 hash;
+		public Settings settings;
 
 		public float3x4 domainTRS;
 
 		public void Execute (int i) {
-			noise[i] = default(N).GetNoise4(
-				domainTRS.TransformVectors(transpose(positions[i])), hash
-			);
+			
+			float4x3 position = domainTRS.TransformVectors(transpose(positions[i]));
+			var hash = SmallXXHash4.Seed(settings.seed);
+			int frequency = settings.frequency;
+			
+
+			float amplitude = 1f, amplitudeSum = 0f;
+			float4 sum = 0f;
+
+				for (int o = 0; o < settings.octaves; o++) {
+					sum += amplitude *  default(N).GetNoise4(frequency * position, hash + o, frequency);
+					amplitudeSum += amplitude;
+					frequency *= settings.lacunarity;
+					amplitude *= settings.persistence;
+				}
+				noise[i] = sum / amplitudeSum;
 		}
 
         public static JobHandle ScheduleParallel (
 			NativeArray<float3x4> positions, NativeArray<float4> noise,
-			int seed, SpaceTRS domainTRS, int resolution, JobHandle dependency
+			Settings settings, SpaceTRS domainTRS, int resolution	, JobHandle dependency
 		) => new Job<N> {
 			positions = positions,
 			noise = noise,
-			hash = SmallXXHash.Seed(seed),
+			settings = settings,
 			domainTRS = domainTRS.Matrix,
 		}.ScheduleParallel(positions.Length, resolution, dependency);
 	
